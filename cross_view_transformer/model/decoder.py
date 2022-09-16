@@ -106,8 +106,19 @@ class CrossAttention(nn.Module):
         v = rearrange(v, 'b n d h w -> b (n h w) d')
 
         # Project with multiple heads
+        device = q.get_device()
+        device = 'cuda:' + str(device)
+        self.to_q.to(device)
         q = self.to_q(q)                                # b (n H W) (heads dim_head)
+
+        device = k.get_device()
+        device = 'cuda:' + str(device)
+        self.to_k.to(device)
         k = self.to_k(k)                                # b (n h w) (heads dim_head)
+
+        device = v.get_device()
+        device = 'cuda:' + str(device)
+        self.to_v.to(device)
         v = self.to_v(v)                                # b (n h w) (heads dim_head)
 
         # Group the head dim with batch dim，此处作用是将multi-heads的heads合并到b维度，作为“个数”
@@ -125,11 +136,20 @@ class CrossAttention(nn.Module):
         a = rearrange(a, '(b m) ... d -> b ... (m d)', m=self.heads, d=self.dim_head)
 
         # Combine multiple heads
+        device = a.get_device()
+        device = 'cuda:' + str(device)
+        self.proj.to(device)
         z = self.proj(a)
 
-        # Optional skip connection
-        if skip is not None:
-            z = z + rearrange(skip, 'b d H W -> b (H W) d')
+        # # Optional skip connection
+        # if skip is not None:
+        #     z = z + rearrange(skip, 'b d H W -> b (H W) d')
+
+        device = z.get_device()
+        device = 'cuda:' + str(device)
+        self.prenorm.to(device)
+        self.mlp.to(device)
+        self.postnorm.to(device)
 
         z = self.prenorm(z)
         z = z + self.mlp(z)
@@ -188,7 +208,7 @@ class CrossViewAttention(nn.Module):
         E_inv: torch.FloatTensor,
     ):
         """
-        x: (b, d, h, w) encoder的输出,key&value
+        x: (b, n, d, h, w) encoder的输出,key&value
         output_query: (b, d, H, W)
         E_inv: (b, n, 4, 4)
 
@@ -220,9 +240,10 @@ class CrossViewAttention(nn.Module):
 
 
         # Expand + refine the BEV embedding
-        query = query_pos + output_query[...,None]                    # b n d H W
-        key = x             # b d h w
-        val = x            # b d h w
+        output_query = output_query
+        query = query_pos + output_query[:, None]                    # b n d H W
+        key = x             # b n d h w
+        val = x            # b n d h w
 
         return self.cross_attend(query, key, val, skip=query if self.skip else None)
 
