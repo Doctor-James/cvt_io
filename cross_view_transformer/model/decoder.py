@@ -176,9 +176,7 @@ class CrossViewAttention(nn.Module):
                 nn.Conv2d(feat_dim, dim, 1, bias=False))
 
         self.bev_embed = nn.Conv2d(2, dim, 1)
-        self.img_embed = nn.Conv2d(4, dim, 1, bias=False)
         self.cam_embed = nn.Conv2d(4, dim, 1, bias=False)
-        self.to_q = nn.Sequential(nn.LayerNorm(dim), nn.Linear(dim, heads * dim_head, bias=qkv_bias))
         self.cross_attend = CrossAttention(dim, heads, dim_head, qkv_bias)
         self.skip = skip
 
@@ -187,19 +185,16 @@ class CrossViewAttention(nn.Module):
         x: torch.FloatTensor,
         bev: BEVEmbedding,
         output_query: torch.FloatTensor,
-        I_inv: torch.FloatTensor,
         E_inv: torch.FloatTensor,
     ):
         """
-        x: (b, d, H, W)
-        feature: (b, n, dim_in, h, w)
-        I_inv: (b, n, 3, 3)
+        x: (b, d, h, w) encoder的输出,key&value
+        output_query: (b, d, H, W)
         E_inv: (b, n, 4, 4)
 
         Returns: (b, d, H, W)
-        H==W==25
         """
-        b, _, _, _= x.shape
+        b, n, _, _= E_inv.shape
 
         pixel = self.image_plane                                                # b n 3 h w
         _, _, _, h, w = pixel.shape
@@ -207,34 +202,29 @@ class CrossViewAttention(nn.Module):
         #此处的c应该是外参中的t，代表相机的位置（x,y,z,1）
         c = E_inv[..., -1:]                                                     # b n 4 1
         c_flat = rearrange(c, 'b n ... -> (b n) ...')[..., None]                # (b n) 4 1 1
+        device = c_flat.get_device()
+        device = 'cuda:' + str(device)
+        self.cam_embed.to(device)
         c_embed = self.cam_embed(c_flat)                                        # (b n) d 1 1
 
-        #此处得到论文中的d
-        pixel_flat = rearrange(pixel, '... h w -> ... (h w)')                   # 1 1 3 (h w)
-        cam = I_inv @ pixel_flat                                                # b n 3 (h w)
-        cam = F.pad(cam, (0, 0, 0, 1, 0, 0, 0, 0), value=1)                     # b n 4 (h w)
-        d = E_inv @ cam                                                         # b n 4 (h w)
-        d_flat = rearrange(d, 'b n d (h w) -> (b n) d h w', h=h, w=w)           # (b n) 4 h w
-        d_embed = self.img_embed(d_flat)                                        # (b n) d h w
 
-        #此处 img_embed为论文中camera-aware positional embeddings δ，不过与论文略有不同，此处为δ - τk
-        img_embed = d_embed - c_embed                                           # (b n) d h w
-        img_embed = img_embed / (img_embed.norm(dim=1, keepdim=True) + 1e-7)    # (b n) d h w
-
-        # world = bev.grid[:2]                                                    # 2 H W
-        # w_embed = self.bev_embed(world[None])                                   # 1 d H W
-        # bev_embed = w_embed - c_embed                                           # (b n) d H W
-        # bev_embed = bev_embed / (bev_embed.norm(dim=1, keepdim=True) + 1e-7)    # (b n) d H W
-        # query_pos = rearrange(bev_embed, '(b n) ... -> b n ...', b=b, n=n)      # b n d H W
+        world = bev.grid[:2]                                                    # 2 H W
+        device = world.get_device()
+        device = 'cuda:' + str(device)
+        self.bev_embed.to(device)
+        w_embed = self.bev_embed(world[None])                                   # 1 d H W
+        bev_embed = w_embed - c_embed                                           # (b n) d H W
+        bev_embed = bev_embed / (bev_embed.norm(dim=1, keepdim=True) + 1e-7)    # (b n) d H W
+        query_pos = rearrange(bev_embed, '(b n) ... -> b n ...', b=b, n=n)      # b n d H W
 
 
 
         # Expand + refine the BEV embedding
-        query = query_pos + x                                                    # b n d H W
+        query = query_pos + output_query[...,None]                    # b n d H W
         key = x             # b d h w
         val = x            # b d h w
 
-        return self.cross_attend(query, key, val, skip=latent_array if self.skip else None)
+        return self.cross_attend(query, key, val, skip=query if self.skip else None)
 
 class DecoderBlock(torch.nn.Module):
     def __init__(self, in_channels, out_channels, skip_dim, residual, factor,):
@@ -270,7 +260,7 @@ class DecoderBlock(torch.nn.Module):
 
 
 class Decoder(nn.Module):
-    def __init__(self, cross_view_out: dict ,dim, blocks, residual=True, factor=2,):
+    def __init__(self, cross_view_out: dict, bev_embedding: dict, dim, blocks, residual=True, factor=2,):
         super().__init__()
 
         layers = list()
@@ -284,8 +274,9 @@ class Decoder(nn.Module):
         self.layers = nn.Sequential(*layers)
         self.out_channels = channels
         self.cross_attens = nn.ModuleList()
-    def forward(self, x):
-        b, x_dim, x_height, x_width = x.shape
+        self.bev_embedding = BEVEmbedding(dim, **bev_embedding)
+    def forward(self, x, E_inv):
+        b, _, x_dim, x_height, x_width = x.shape
 
         cross_attens = list()
         cva = CrossViewAttention(x_height, x_width, x_dim, x_dim, **self.cross_view_out)
@@ -295,7 +286,7 @@ class Decoder(nn.Module):
         output_query = self.bev_embedding.get_prior()                         # d H W
         output_query = repeat(output_query, '... -> b ...', b=b)              # b d H W
         for cross_atten in zip(self.cross_attens):
-            x = cross_atten(x, self.bev_embedding, feature, I_inv, E_inv)
+            x = cross_atten[0](x, self.bev_embedding, output_query, E_inv)
         y = x
 
         for layer in self.layers:

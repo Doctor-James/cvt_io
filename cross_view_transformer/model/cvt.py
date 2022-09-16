@@ -33,8 +33,8 @@ class CrossViewTransformer(nn.Module):
             nn.Conv2d(dim_last, dim_max, 1))
 
     def forward(self, batch):
-        x = self.encoder(batch)
-        y = self.decoder(x)
+        x, E_inv = self.encoder(batch)
+        y = self.decoder(x, E_inv)
         z = self.to_logits(y)
 
         return {k: z[:, start:stop] for k, (start, stop) in self.outputs.items()}
