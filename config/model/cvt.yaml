@@ -54,3 +54,13 @@ decoder:
   blocks: [128, 128, 64]
   residual: True
   factor: 2
+
+  cross_view_out:
+    heads: 4
+    dim_head: 32
+    qkv_bias: True
+    skip: True
+    no_image_features: False
+
+    image_height: ${data.image.h}
+    image_width: ${data.image.w}

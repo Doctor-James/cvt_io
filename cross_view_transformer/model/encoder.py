@@ -156,7 +156,7 @@ class Latent_array(nn.Module):
             array_N,
             array_D,
     ):
-        super.__init__()
+        super().__init__()
         self.learned_array = nn.Parameter(sigma * torch.randn(dim, array_N, array_D)) # d N D
     def get_array(self):
         return self.learned_array
@@ -289,6 +289,7 @@ class CrossAttention(nn.Module):
         return z
 
 
+
 class CrossViewAttention(nn.Module):
     def __init__(
         self,
@@ -329,20 +330,20 @@ class CrossViewAttention(nn.Module):
         self.bev_embed = nn.Conv2d(2, dim, 1)
         self.img_embed = nn.Conv2d(4, dim, 1, bias=False)
         self.cam_embed = nn.Conv2d(4, dim, 1, bias=False)
-
+        self.to_q = nn.Sequential(nn.LayerNorm(dim), nn.Linear(dim, heads * dim_head, bias=qkv_bias))
         self.cross_attend = CrossAttention(dim, heads, dim_head, qkv_bias)
         self.skip = skip
 
     def forward(
         self,
-        x: torch.FloatTensor,
+        latent_array: torch.FloatTensor,
         bev: BEVEmbedding,
         feature: torch.FloatTensor,
         I_inv: torch.FloatTensor,
         E_inv: torch.FloatTensor,
     ):
         """
-        x: (b, c, H, W)
+        latent_array: (b, d, H, W)
         feature: (b, n, dim_in, h, w)
         I_inv: (b, n, 3, 3)
         E_inv: (b, n, 4, 4)
@@ -372,11 +373,11 @@ class CrossViewAttention(nn.Module):
         img_embed = d_embed - c_embed                                           # (b n) d h w
         img_embed = img_embed / (img_embed.norm(dim=1, keepdim=True) + 1e-7)    # (b n) d h w
 
-        world = bev.grid[:2]                                                    # 2 H W
-        w_embed = self.bev_embed(world[None])                                   # 1 d H W
-        bev_embed = w_embed - c_embed                                           # (b n) d H W
-        bev_embed = bev_embed / (bev_embed.norm(dim=1, keepdim=True) + 1e-7)    # (b n) d H W
-        query_pos = rearrange(bev_embed, '(b n) ... -> b n ...', b=b, n=n)      # b n d H W
+        # world = bev.grid[:2]                                                    # 2 H W
+        # w_embed = self.bev_embed(world[None])                                   # 1 d H W
+        # bev_embed = w_embed - c_embed                                           # (b n) d H W
+        # bev_embed = bev_embed / (bev_embed.norm(dim=1, keepdim=True) + 1e-7)    # (b n) d H W
+        # query_pos = rearrange(bev_embed, '(b n) ... -> b n ...', b=b, n=n)      # b n d H W
 
         feature_flat = rearrange(feature, 'b n ... -> (b n) ...')               # (b n) d h w
 
@@ -386,13 +387,13 @@ class CrossViewAttention(nn.Module):
             key_flat = img_embed                                                # (b n) d h w
 
         val_flat = self.feature_linear(feature_flat)                            # (b n) d h w
-
+        latent_array_ = repeat(latent_array,'b ... -> b n ...',n=6)              # b n d H W
         # Expand + refine the BEV embedding
-        query = query_pos + x[:, None]                                          # b n d H W
+        query = latent_array_                                                    # b n d H W
         key = rearrange(key_flat, '(b n) ... -> b n ...', b=b, n=n)             # b n d h w
         val = rearrange(val_flat, '(b n) ... -> b n ...', b=b, n=n)             # b n d h w
 
-        return self.cross_attend(query, key, val, skip=x if self.skip else None)
+        return self.cross_attend(query, key, val, skip=latent_array if self.skip else None)
 
 
 class Encoder(nn.Module):
@@ -429,12 +430,10 @@ class Encoder(nn.Module):
             cva = CrossViewAttention(feat_height, feat_width, feat_dim, dim, **cross_view)
             cross_views.append(cva)
 
-            sva = SelfAttention(dim, 4, 32, True)
-            self_attens.append(sva)
-
             layer = nn.Sequential(*[ResNetBottleNeck(dim) for _ in range(num_layers)])
             layers.append(layer)
 
+        self_attens.append(SelfAttention(dim, 4, 32, True))
         self.bev_embedding = BEVEmbedding(dim, **bev_embedding)
         self.latent_array = Latent_array(dim, **latent_array)
         self.cross_views = nn.ModuleList(cross_views)
@@ -451,15 +450,15 @@ class Encoder(nn.Module):
 
         features = [self.down(y) for y in self.backbone(self.norm(image))] #提取特征
 
-        x = self.bev_embedding.get_prior()              # d H W
+        x = self.latent_array.get_array()               # d H W latent array
         x = repeat(x, '... -> b ...', b=b)              # b d H W
 
         for cross_view, feature, layer in zip(self.cross_views, features, self.layers):
             feature = rearrange(feature, '(b n) ... -> b n ...', b=b, n=n)
             x = cross_view(x, self.bev_embedding, feature, I_inv, E_inv)
             x = layer(x)
-        for i in range(3):
-            x = self.self_attends(x, x, x, x)
-            x = layer(x)
+        for self_attend in zip(self.self_attends):
+            for i in range(6):
+                x = self_attend[0](x, x, x, x)
 
         return x
