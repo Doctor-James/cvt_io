@@ -327,10 +327,9 @@ class CrossViewAttention(nn.Module):
                 nn.ReLU(),
                 nn.Conv2d(feat_dim, dim, 1, bias=False))
 
-        self.bev_embed = nn.Conv2d(2, dim, 1)
+        # self.bev_embed = nn.Conv2d(2, dim, 1)
         self.img_embed = nn.Conv2d(4, dim, 1, bias=False)
         self.cam_embed = nn.Conv2d(4, dim, 1, bias=False)
-        self.to_q = nn.Sequential(nn.LayerNorm(dim), nn.Linear(dim, heads * dim_head, bias=qkv_bias))
         self.cross_attend = CrossAttention(dim, heads, dim_head, qkv_bias)
         self.skip = skip
 
@@ -431,7 +430,7 @@ class Encoder(nn.Module):
             layers.append(layer)
 
         self_attens.append(SelfAttention(dim, 4, 32, True))
-        self.bev_embedding = BEVEmbedding(dim, **bev_embedding)
+        self.E_inv = 0
         self.latent_array = Latent_array(dim, **latent_array)
         self.cross_views = nn.ModuleList(cross_views)
         self.layers = nn.ModuleList(layers)
@@ -442,6 +441,7 @@ class Encoder(nn.Module):
         image = batch['image'].flatten(0, 1)            # b n c h w
         I_inv = batch['intrinsics'].inverse()           # b n 3 3
         E_inv = batch['extrinsics'].inverse()           # b n 4 4
+        self.E_inv = E_inv
         # I_inv = invmat(batch['intrinsics'])
         # E_inv = invmat(batch['extrinsics'])
 
@@ -460,4 +460,7 @@ class Encoder(nn.Module):
             for i in range(6):
                 x = self_attend[0](x, x, x, x)
 
-        return x, E_inv
+        return x
+    def get_E_inv(self):
+        return self.E_inv
+

@@ -106,19 +106,8 @@ class CrossAttention(nn.Module):
         v = rearrange(v, 'b n d h w -> b (n h w) d')
 
         # Project with multiple heads
-        # device = q.get_device()
-        # device = 'cuda:' + str(device)
-        # self.to_q.to(device)
         q = self.to_q(q)                                # b (n H W) (heads dim_head)
-
-        # device = k.get_device()
-        # device = 'cuda:' + str(device)
-        # self.to_k.to(device)
         k = self.to_k(k)                                # b (n h w) (heads dim_head)
-
-        # device = v.get_device()
-        # device = 'cuda:' + str(device)
-        # self.to_v.to(device)
         v = self.to_v(v)                                # b (n h w) (heads dim_head)
 
         # Group the head dim with batch dim，此处作用是将multi-heads的heads合并到b维度，作为“个数”
@@ -136,20 +125,11 @@ class CrossAttention(nn.Module):
         a = rearrange(a, '(b m) ... d -> b ... (m d)', m=self.heads, d=self.dim_head)
 
         # Combine multiple heads
-        # device = a.get_device()
-        # device = 'cuda:' + str(device)
-        # self.proj.to(device)
         z = self.proj(a)
 
         # # Optional skip connection
         # if skip is not None:
         #     z = z + rearrange(skip, 'b d H W -> b (H W) d')
-
-        # device = z.get_device()
-        # device = 'cuda:' + str(device)
-        # self.prenorm.to(device)
-        # self.mlp.to(device)
-        # self.postnorm.to(device)
 
         z = self.prenorm(z)
         z = z + self.mlp(z)
@@ -175,25 +155,7 @@ class CrossViewAttention(nn.Module):
     ):
         super().__init__()
 
-        # 1 1 3 h w
-        image_plane = generate_grid(feat_height, feat_width)[None] #feat_height为image feature的高（多尺度）
-        image_plane[:, :, 0] *= image_width
-        image_plane[:, :, 1] *= image_height
 
-        self.register_buffer('image_plane', image_plane, persistent=False)
-
-        self.feature_linear = nn.Sequential(
-            nn.BatchNorm2d(feat_dim),
-            nn.ReLU(),
-            nn.Conv2d(feat_dim, dim, 1, bias=False))
-
-        if no_image_features:
-            self.feature_proj = None
-        else:
-            self.feature_proj = nn.Sequential(
-                nn.BatchNorm2d(feat_dim),
-                nn.ReLU(),
-                nn.Conv2d(feat_dim, dim, 1, bias=False))
 
         self.bev_embed = nn.Conv2d(2, dim, 1)
         self.cam_embed = nn.Conv2d(4, dim, 1, bias=False)
@@ -216,22 +178,16 @@ class CrossViewAttention(nn.Module):
         """
         b, n, _, _= E_inv.shape
 
-        pixel = self.image_plane                                                # b n 3 h w
-        _, _, _, h, w = pixel.shape
+        # pixel = self.image_plane                                                # b n 3 h w
+        # _, _, _, h, w = pixel.shape
 
         #此处的c应该是外参中的t，代表相机的位置（x,y,z,1）
         c = E_inv[..., -1:]                                                     # b n 4 1
         c_flat = rearrange(c, 'b n ... -> (b n) ...')[..., None]                # (b n) 4 1 1
-        # device = c_flat.get_device()
-        # device = 'cuda:' + str(device)
-        # self.cam_embed.to(device)
         c_embed = self.cam_embed(c_flat)                                        # (b n) d 1 1
 
 
         world = bev.grid[:2]                                                    # 2 H W
-        # device = world.get_device()
-        # device = 'cuda:' + str(device)
-        # self.bev_embed.to(device)
         w_embed = self.bev_embed(world[None])                                   # 1 d H W
         bev_embed = w_embed - c_embed                                           # (b n) d H W
         bev_embed = bev_embed / (bev_embed.norm(dim=1, keepdim=True) + 1e-7)    # (b n) d H W
@@ -299,10 +255,7 @@ class Decoder(nn.Module):
         self.out_channels = channels
         self.bev_embedding = BEVEmbedding(dim, **bev_embedding)
     def forward(self, x, E_inv):
-        b, _, x_dim, x_height, x_width = x.shape
-
-
-
+        b, _, _, _, _ = x.shape
         output_query = self.bev_embedding.get_prior()                         # d H W
         output_query = repeat(output_query, '... -> b ...', b=b)              # b d H W
         for cross_atten in zip(self.cross_attens):

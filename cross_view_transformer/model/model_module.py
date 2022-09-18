@@ -17,7 +17,6 @@ class ModelModule(pl.LightningModule):
         self.optimizer_args = optimizer_args
         self.scheduler_args = scheduler_args
         self.idx = 0
-
     def forward(self, batch):
         return self.backbone(batch)
 

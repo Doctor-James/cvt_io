@@ -1,5 +1,5 @@
 import torch.nn as nn
-
+import torch
 
 class CrossViewTransformer(nn.Module):
     def __init__(
@@ -33,8 +33,10 @@ class CrossViewTransformer(nn.Module):
             nn.Conv2d(dim_last, dim_max, 1))
 
     def forward(self, batch):
-        x, E_inv = self.encoder(batch)
+        x = self.encoder(batch)
+        E_inv = self.encoder.get_E_inv()
         y = self.decoder(x, E_inv)
         z = self.to_logits(y)
+
 
         return {k: z[:, start:stop].contiguous() for k, (start, stop) in self.outputs.items()}
