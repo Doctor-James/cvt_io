@@ -30,13 +30,13 @@ class BEVEmbedding(nn.Module):
     def __init__(
         self,
         dim: int,
-        sigma: int,
-        bev_height: int,
-        bev_width: int,
-        h_meters: int,
-        w_meters: int,
-        offset: int,
-        decoder_blocks: list,
+        sigma: int = 1,
+        bev_height: int = 200,
+        bev_width: int = 200,
+        h_meters: int = 100,
+        w_meters: int = 100,
+        offset: int = 0,
+        decoder_blocks: list = [128, 128, 64],
     ):
         """
         Only real arguments are:
@@ -141,16 +141,10 @@ class CrossAttention(nn.Module):
 class CrossViewAttention(nn.Module):
     def __init__(
         self,
-        feat_height: int,
-        feat_width: int,
-        feat_dim: int,
         dim: int,
-        image_height: int,
-        image_width: int,
         qkv_bias: bool,
         heads: int = 4,
         dim_head: int = 32,
-        no_image_features: bool = False,
         skip: bool = True,
     ):
         super().__init__()
@@ -237,7 +231,7 @@ class DecoderBlock(torch.nn.Module):
 
 
 class Decoder(nn.Module):
-    def __init__(self, cross_view_out: dict, bev_embedding: dict, latent_array: dict, dim, blocks, residual=True, factor=2,):
+    def __init__(self, dim, blocks, residual=True, factor=2,):
         super().__init__()
 
         layers = list()
@@ -248,12 +242,12 @@ class Decoder(nn.Module):
 
             channels = out_channels
         cross_attens = list()
-        cva = CrossViewAttention(latent_array['array_N'], latent_array['array_D'], dim, dim, **cross_view_out)
+        cva = CrossViewAttention(dim, True, 4 , 32, True)
         cross_attens.append(cva)
         self.cross_attens = nn.ModuleList(cross_attens)
         self.layers = nn.Sequential(*layers)
         self.out_channels = channels
-        self.bev_embedding = BEVEmbedding(dim, **bev_embedding)
+        self.bev_embedding = BEVEmbedding(dim)
     def forward(self, x, E_inv):
         b, _, _, _, _ = x.shape
         output_query = self.bev_embedding.get_prior()                         # d H W

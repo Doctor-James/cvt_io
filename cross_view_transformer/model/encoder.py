@@ -148,7 +148,7 @@ class BEVEmbedding(nn.Module):
         return self.learned_features #此处的learned_features应该为query中的c
 
 
-class Latent_array(nn.Module):
+class latent_array_(nn.Module):
     def __init__(
             self,
             dim,
@@ -398,7 +398,7 @@ class Encoder(nn.Module):
             backbone,
             cross_view: dict,
             bev_embedding: dict,
-            latent_array: dict,
+            # latent_array: dict,
             dim: int = 128,
             middle: List[int] = [2, 2],
             scale: float = 1.0,
@@ -431,7 +431,7 @@ class Encoder(nn.Module):
 
         self_attens.append(SelfAttention(dim, 4, 32, True))
         self.E_inv = 0
-        self.latent_array = Latent_array(dim, **latent_array)
+        self.latent_array = latent_array_(dim, 1,10,10)
         self.cross_views = nn.ModuleList(cross_views)
         self.layers = nn.ModuleList(layers)
         self.self_attends = nn.ModuleList(self_attens)

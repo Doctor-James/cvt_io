@@ -42,10 +42,10 @@ encoder:
 
     decoder_blocks: ${model.decoder.blocks}
 
-  latent_array:
-    sigma: 1.0
-    array_N: 10
-    array_D: 10
+#  latent_array:
+#    sigma: 1.0
+#    array_N: 10
+#    array_D: 10
 
 decoder:
   _target_: cross_view_transformer.model.decoder.Decoder
@@ -55,27 +55,28 @@ decoder:
   residual: True
   factor: 2
 
-  cross_view_out:
-    heads: 4
-    dim_head: 32
-    qkv_bias: True
-    skip: True
-    no_image_features: False
+#  cross_view_out:
+#    heads: 4
+#    dim_head: 32
+#    qkv_bias: True
+#    skip: True
+#    no_image_features: False
+#
+#    image_height: ${data.image.h}
+#    image_width: ${data.image.w}
 
-    image_height: ${data.image.h}
-    image_width: ${data.image.w}
+#  latent_array:
+#    array_N: ${model.encoder.latent_array.array_N}
+#    array_D: ${model.encoder.latent_array.array_D}
 
-  latent_array:
-    array_N: ${model.encoder.latent_array.array_N}
-    array_D: ${model.encoder.latent_array.array_D}
 
-  bev_embedding:
-    sigma: 1.0
-
-    bev_height: ${data.bev.h}
-    bev_width: ${data.bev.w}
-    h_meters: ${data.bev.h_meters}
-    w_meters: ${data.bev.w_meters}
-    offset: ${data.bev.offset}
-
-    decoder_blocks: ${model.decoder.blocks}
+#  bev_embedding:
+#    sigma: 1.0
+#
+#    bev_height: ${data.bev.h}
+#    bev_width: ${data.bev.w}
+#    h_meters: ${data.bev.h_meters}
+#    w_meters: ${data.bev.w_meters}
+#    offset: ${data.bev.offset}
+#
+#    decoder_blocks: ${model.decoder.blocks}

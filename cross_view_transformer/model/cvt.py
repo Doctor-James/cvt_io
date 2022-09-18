@@ -1,5 +1,4 @@
 import torch.nn as nn
-import torch
 
 class CrossViewTransformer(nn.Module):
     def __init__(
