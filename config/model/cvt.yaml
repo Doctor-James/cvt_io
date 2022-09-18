@@ -65,6 +65,10 @@ decoder:
     image_height: ${data.image.h}
     image_width: ${data.image.w}
 
+  latent_array:
+    array_N: ${model.encoder.latent_array.array_N}
+    array_D: ${model.encoder.latent_array.array_D}
+
   bev_embedding:
     sigma: 1.0
 

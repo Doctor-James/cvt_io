@@ -106,19 +106,19 @@ class CrossAttention(nn.Module):
         v = rearrange(v, 'b n d h w -> b (n h w) d')
 
         # Project with multiple heads
-        device = q.get_device()
-        device = 'cuda:' + str(device)
-        self.to_q.to(device)
+        # device = q.get_device()
+        # device = 'cuda:' + str(device)
+        # self.to_q.to(device)
         q = self.to_q(q)                                # b (n H W) (heads dim_head)
 
-        device = k.get_device()
-        device = 'cuda:' + str(device)
-        self.to_k.to(device)
+        # device = k.get_device()
+        # device = 'cuda:' + str(device)
+        # self.to_k.to(device)
         k = self.to_k(k)                                # b (n h w) (heads dim_head)
 
-        device = v.get_device()
-        device = 'cuda:' + str(device)
-        self.to_v.to(device)
+        # device = v.get_device()
+        # device = 'cuda:' + str(device)
+        # self.to_v.to(device)
         v = self.to_v(v)                                # b (n h w) (heads dim_head)
 
         # Group the head dim with batch dim，此处作用是将multi-heads的heads合并到b维度，作为“个数”
@@ -136,20 +136,20 @@ class CrossAttention(nn.Module):
         a = rearrange(a, '(b m) ... d -> b ... (m d)', m=self.heads, d=self.dim_head)
 
         # Combine multiple heads
-        device = a.get_device()
-        device = 'cuda:' + str(device)
-        self.proj.to(device)
+        # device = a.get_device()
+        # device = 'cuda:' + str(device)
+        # self.proj.to(device)
         z = self.proj(a)
 
         # # Optional skip connection
         # if skip is not None:
         #     z = z + rearrange(skip, 'b d H W -> b (H W) d')
 
-        device = z.get_device()
-        device = 'cuda:' + str(device)
-        self.prenorm.to(device)
-        self.mlp.to(device)
-        self.postnorm.to(device)
+        # device = z.get_device()
+        # device = 'cuda:' + str(device)
+        # self.prenorm.to(device)
+        # self.mlp.to(device)
+        # self.postnorm.to(device)
 
         z = self.prenorm(z)
         z = z + self.mlp(z)
@@ -222,16 +222,16 @@ class CrossViewAttention(nn.Module):
         #此处的c应该是外参中的t，代表相机的位置（x,y,z,1）
         c = E_inv[..., -1:]                                                     # b n 4 1
         c_flat = rearrange(c, 'b n ... -> (b n) ...')[..., None]                # (b n) 4 1 1
-        device = c_flat.get_device()
-        device = 'cuda:' + str(device)
-        self.cam_embed.to(device)
+        # device = c_flat.get_device()
+        # device = 'cuda:' + str(device)
+        # self.cam_embed.to(device)
         c_embed = self.cam_embed(c_flat)                                        # (b n) d 1 1
 
 
         world = bev.grid[:2]                                                    # 2 H W
-        device = world.get_device()
-        device = 'cuda:' + str(device)
-        self.bev_embed.to(device)
+        # device = world.get_device()
+        # device = 'cuda:' + str(device)
+        # self.bev_embed.to(device)
         w_embed = self.bev_embed(world[None])                                   # 1 d H W
         bev_embed = w_embed - c_embed                                           # (b n) d H W
         bev_embed = bev_embed / (bev_embed.norm(dim=1, keepdim=True) + 1e-7)    # (b n) d H W
@@ -281,7 +281,7 @@ class DecoderBlock(torch.nn.Module):
 
 
 class Decoder(nn.Module):
-    def __init__(self, cross_view_out: dict, bev_embedding: dict, dim, blocks, residual=True, factor=2,):
+    def __init__(self, cross_view_out: dict, bev_embedding: dict, latent_array: dict, dim, blocks, residual=True, factor=2,):
         super().__init__()
 
         layers = list()
@@ -291,23 +291,24 @@ class Decoder(nn.Module):
             layers.append(layer)
 
             channels = out_channels
-        self.cross_view_out = cross_view_out
+        cross_attens = list()
+        cva = CrossViewAttention(latent_array['array_N'], latent_array['array_D'], dim, dim, **cross_view_out)
+        cross_attens.append(cva)
+        self.cross_attens = nn.ModuleList(cross_attens)
         self.layers = nn.Sequential(*layers)
         self.out_channels = channels
-        self.cross_attens = nn.ModuleList()
         self.bev_embedding = BEVEmbedding(dim, **bev_embedding)
     def forward(self, x, E_inv):
         b, _, x_dim, x_height, x_width = x.shape
 
-        cross_attens = list()
-        cva = CrossViewAttention(x_height, x_width, x_dim, x_dim, **self.cross_view_out)
-        cross_attens.append(cva)
-        self.cross_attens = nn.ModuleList(cross_attens)
+
 
         output_query = self.bev_embedding.get_prior()                         # d H W
         output_query = repeat(output_query, '... -> b ...', b=b)              # b d H W
         for cross_atten in zip(self.cross_attens):
             x = cross_atten[0](x, self.bev_embedding, output_query, E_inv)
+
+        # cvt decoder
         y = x
 
         for layer in self.layers:

@@ -37,4 +37,4 @@ class CrossViewTransformer(nn.Module):
         y = self.decoder(x, E_inv)
         z = self.to_logits(y)
 
-        return {k: z[:, start:stop] for k, (start, stop) in self.outputs.items()}
+        return {k: z[:, start:stop].contiguous() for k, (start, stop) in self.outputs.items()}
