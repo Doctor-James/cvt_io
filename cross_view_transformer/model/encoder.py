@@ -180,21 +180,21 @@ class SelfAttention(nn.Module):
         self.postnorm = norm(dim)
     def forward(self, q, k, v, skip=None):
         """
-        q: (b n d H W)
-        k: (b n d h w)
-        v: (b n d h w)
+        q: (b d H W)
+        k: (b d h w)
+        v: (b d h w)
         """
-        _, _, _, H, W = q.shape
+        _, _, H, W = q.shape
 
         # Move feature dim to last for multi-head proj
-        q = rearrange(q, 'b n d H W -> b n (H W) d')
-        k = rearrange(k, 'b n d h w -> b n (h w) d')
-        v = rearrange(v, 'b n d h w -> b n (h w) d')
+        q = rearrange(q, 'b d H W -> b (H W) d')
+        k = rearrange(k, 'b d h w -> b (h w) d')
+        v = rearrange(v, 'b d h w -> b (h w) d')
 
         # Project with multiple heads
-        q = self.to_q(q)                                # b (n H W) (heads dim_head)
-        k = self.to_k(k)                                # b (n h w) (heads dim_head)
-        v = self.to_v(v)                                # b (n h w) (heads dim_head)
+        q = self.to_q(q)                                # b (H W) (heads dim_head)
+        k = self.to_k(k)                                # b (h w) (heads dim_head)
+        v = self.to_v(v)                                # b (h w) (heads dim_head)
 
         # Group the head dim with batch dim，此处作用是将multi-heads的heads合并到b维度，作为“个数”
         q = rearrange(q, 'b ... (m d) -> (b m) ... d', m=self.heads, d=self.dim_head)
@@ -202,25 +202,25 @@ class SelfAttention(nn.Module):
         v = rearrange(v, 'b ... (m d) -> (b m) ... d', m=self.heads, d=self.dim_head)
 
         # Dot product attention along cameras，attention = softmax(Q @ K^t)V
-        dot = self.scale * torch.einsum('b n Q d, b n K d -> b n Q K', q, k) #q与k的转置相乘
+        dot = self.scale * torch.einsum('b Q d, b K d -> b Q K', q, k) #q与k的转置相乘
         # dot = rearrange(dot, 'b n Q K -> b Q (n K)')
         att = dot.softmax(dim=-1)
 
         # Combine values (image level features).
-        a = torch.einsum('b n Q K, b n K d -> b n Q d', att, v)
+        a = torch.einsum('b Q K, b K d -> b Q d', att, v)
         a = rearrange(a, '(b m) ... d -> b ... (m d)', m=self.heads, d=self.dim_head)
 
         # Combine multiple heads
-        z = self.proj(a)                     # b n (H W) d
+        z = self.proj(a)                     # b (H W) d
 
         # Optional skip connection
         if skip is not None:
-            z = z + rearrange(skip, 'b n d H W -> b n (H W) d')
+            z = z + rearrange(skip, 'b d H W -> b (H W) d')
 
         z = self.prenorm(z)
         z = z + self.mlp(z)
         z = self.postnorm(z)
-        z = rearrange(z, 'b n (H W) d -> b n d H W', H=H, W=W)
+        z = rearrange(z, 'b (H W) d -> b d H W', H=H, W=W)
 
         return z
 
@@ -253,7 +253,7 @@ class CrossAttention(nn.Module):
         # Move feature dim to last for multi-head proj
         q = rearrange(q, 'b n d H W -> b n (H W) d')
         k = rearrange(k, 'b n d h w -> b n (h w) d')
-        v = rearrange(v, 'b n d h w -> b n (h w) d')
+        v = rearrange(v, 'b n d h w -> b (n h w) d')
 
         # Project with multiple heads
         q = self.to_q(q)                                # b (n H W) (heads dim_head)
@@ -267,24 +267,24 @@ class CrossAttention(nn.Module):
 
         # Dot product attention along cameras，attention = softmax(Q @ K^t)V
         dot = self.scale * torch.einsum('b n Q d, b n K d -> b n Q K', q, k) #q与k的转置相乘
-        # dot = rearrange(dot, 'b n Q K -> b Q (n K)')
+        dot = rearrange(dot, 'b n Q K -> b Q (n K)')
         att = dot.softmax(dim=-1)
 
         # Combine values (image level features).
-        a = torch.einsum('b n Q K, b n K d -> b n Q d', att, v)
+        a = torch.einsum('b Q K, b K d -> b Q d', att, v)
         a = rearrange(a, '(b m) ... d -> b ... (m d)', m=self.heads, d=self.dim_head)
 
         # Combine multiple heads
-        z = self.proj(a)                     # b n (H W) d
+        z = self.proj(a)                     # b  (H W) d
 
         # Optional skip connection
         if skip is not None:
-            z = z + rearrange(skip, 'b n d H W -> b n (H W) d')
+            z = z + rearrange(skip, 'b d H W -> b (H W) d')
 
         z = self.prenorm(z)
         z = z + self.mlp(z)
         z = self.postnorm(z)
-        z = rearrange(z, 'b n (H W) d -> b n d H W', H=H, W=W)
+        z = rearrange(z, 'b (H W) d -> b d H W', H=H, W=W)
 
         return z
 
@@ -341,7 +341,7 @@ class CrossViewAttention(nn.Module):
         E_inv: torch.FloatTensor,
     ):
         """
-        latent_array: (b, n, d, H, W)
+        latent_array: (b, d, H, W)
         feature: (b, n, dim_in, h, w)
         I_inv: (b, n, 3, 3)
         E_inv: (b, n, 4, 4)
@@ -385,11 +385,11 @@ class CrossViewAttention(nn.Module):
 
         val_flat = self.feature_linear(feature_flat)                            # (b n) d h w
         # Expand + refine the BEV embedding
-        query = latent_array                                                    # b n d H W
+        query = repeat(latent_array, 'b ... -> b n ...', n=6)                   # b n d H W
         key = rearrange(key_flat, '(b n) ... -> b n ...', b=b, n=n)             # b n d h w
         val = rearrange(val_flat, '(b n) ... -> b n ...', b=b, n=n)             # b n d h w
 
-        return self.cross_attend(query, key, val, skip=query if self.skip else None)
+        return self.cross_attend(query, key, val, skip=latent_array if self.skip else None)
 
 
 class Encoder(nn.Module):
@@ -397,8 +397,8 @@ class Encoder(nn.Module):
             self,
             backbone,
             cross_view: dict,
-            bev_embedding: dict,
-            # latent_array: dict,
+            self_attention: dict,
+            latent_array: dict,
             dim: int = 128,
             middle: List[int] = [2, 2],
             scale: float = 1.0,
@@ -429,9 +429,9 @@ class Encoder(nn.Module):
             layer = nn.Sequential(*[ResNetBottleNeck(dim) for _ in range(num_layers)])
             layers.append(layer)
 
-        self_attens.append(SelfAttention(dim, 4, 32, True))
+        self_attens.append(SelfAttention(dim, **self_attention))
         self.E_inv = 0
-        self.latent_array = latent_array_(dim, 1,10,10)
+        self.latent_array = latent_array_(dim, **latent_array)
         self.cross_views = nn.ModuleList(cross_views)
         self.layers = nn.ModuleList(layers)
         self.self_attends = nn.ModuleList(self_attens)
@@ -449,13 +449,10 @@ class Encoder(nn.Module):
 
         x = self.latent_array.get_array()               # d H W latent array
         x = repeat(x, '... -> b ...', b=b)              # b d H W
-        x = repeat(x, 'b ... -> b n ...', n=6)          # b n d H W
         for cross_view, feature, layer in zip(self.cross_views, features, self.layers):
             feature = rearrange(feature, '(b n) ... -> b n ...', b=b, n=n)
             x = cross_view(x, feature, I_inv, E_inv)
-            x = rearrange(x, 'b n ... -> (b n) ...', b=b, n=n)
             x = layer(x)
-            x = rearrange(x, '(b n) ... -> b n ...', b=b, n=n)
         for self_attend in zip(self.self_attends):
             for i in range(6):
                 x = self_attend[0](x, x, x, x)

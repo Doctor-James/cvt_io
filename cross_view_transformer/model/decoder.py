@@ -231,7 +231,7 @@ class DecoderBlock(torch.nn.Module):
 
 
 class Decoder(nn.Module):
-    def __init__(self, dim, blocks, residual=True, factor=2,):
+    def __init__(self, cross_view_out: dict, bev_embedding:dict, dim, blocks, residual=True, factor=2,):
         super().__init__()
 
         layers = list()
@@ -242,14 +242,15 @@ class Decoder(nn.Module):
 
             channels = out_channels
         cross_attens = list()
-        cva = CrossViewAttention(dim, True, 4 , 32, True)
+        cva = CrossViewAttention(dim, **cross_view_out)
         cross_attens.append(cva)
         self.cross_attens = nn.ModuleList(cross_attens)
         self.layers = nn.Sequential(*layers)
         self.out_channels = channels
-        self.bev_embedding = BEVEmbedding(dim)
+        self.bev_embedding = BEVEmbedding(dim,**bev_embedding)
     def forward(self, x, E_inv):
-        b, _, _, _, _ = x.shape
+        b, _, _, _ = x.shape
+        x = repeat(x, 'b ... -> b n ...', n=6)  # b n d H W
         output_query = self.bev_embedding.get_prior()                         # d H W
         output_query = repeat(output_query, '... -> b ...', b=b)              # b d H W
         for cross_atten in zip(self.cross_attens):

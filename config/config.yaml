@@ -18,7 +18,7 @@ experiment:
   log_image_interval: 500
 
 loader:
-  batch_size: 5
+  batch_size: 11
   num_workers: 4
   pin_memory: True
   prefetch_factor: 4
@@ -42,7 +42,7 @@ trainer:
   max_steps: 100001
   log_every_n_steps: 50
 
-  gpus: 2
+  gpus: [1,2]
   precision: 32
 
   limit_train_batches: 1.0
