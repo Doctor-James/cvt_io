@@ -12,15 +12,35 @@ latent array： N = 10，L = 6，self attention shape：[b, d, H, W]
 
 100K steps, lr: 4e-3, wd: 1e-7
 
+![image-20220930120924318](C:\Users\HASEE\AppData\Roaming\Typora\typora-user-images\image-20220930120924318.png)
+
 ## cvt_io_v2_2 :
 
 latent array： N = 5，L = 6，self attention shape：[b, d, H, W]
 
 100K steps, lr: 4e-3, wd: 1e-7
 
+![image-20220930121401630](C:\Users\HASEE\AppData\Roaming\Typora\typora-user-images\image-20220930121401630.png)
+
+## cvt_io_v2_3:
+
+latent array： N = 10，L = 6，self attention shape：[b, d, H, W]，self attention不共享权值
+
+100K steps, lr: 4e-3, wd: 1e-7
+
+梯度爆炸，loss突然暴涨，不收敛
+
+![image-20220930120904641](C:\Users\HASEE\AppData\Roaming\Typora\typora-user-images\image-20220930120904641.png)
+
+## cvt_io_v2_4:
+
+latent array： N = 10，L = 6，self attention shape：[b, d, H, W]，self attention不共享权值
+
+100K steps, lr: 1e-3, wd: 1e-7
+
 |             | **IOU@0.50** | **Params** | **FLOPs** | **Cost-Time** |
 | ----------- | ------------ | ---------- | --------- | ------------- |
-| cvt         | 0.36         | 670.32K    | 6.934G    | 58.62ms       |
+| cvt         | 0.36         | 670.32K    | 6.934G    | 46.67ms       |
 | cvt_io_v1_1 | 0.34         | 936.94K    | 7.438G    | 36.91ms       |
-| cvt_io_v2_1 | 0.34         | 936.94K    | 6.918G    | 37.01ms       |
-| cvt_io_v2_2 | 0.328        | 936.94K    | 6.81G     | 38.01ms       |
+| cvt_io_v2_1 | 0.34         | 936.94K    | 6.918G    | 35.17ms       |
+| cvt_io_v2_2 | 0.328        | 936.94K    | 6.81G     | 33.08ms       |
