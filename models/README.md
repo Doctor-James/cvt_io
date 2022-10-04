@@ -46,9 +46,12 @@ latent array： N = 3，L = 6，self attention shape：[b, d, H, W]，self atten
 
 100K steps, lr: 4e-3, wd: 1e-7
 
+![image-20221004153728730](C:\Users\HASEE\AppData\Roaming\Typora\typora-user-images\image-20221004153728730.png)
+
 |             | **IOU@0.50** | **Params** | **FLOPs** | **Cost-Time** |
 | ----------- | ------------ | ---------- | --------- | ------------- |
 | cvt         | 0.36         | 670.32K    | 6.934G    | 46.67ms       |
 | cvt_io_v1_1 | 0.34         | 936.94K    | 7.438G    | 36.91ms       |
 | cvt_io_v2_1 | 0.34         | 936.94K    | 6.918G    | 35.17ms       |
 | cvt_io_v2_2 | 0.328        | 936.94K    | 6.81G     | 33.08ms       |
+| cvt_io_v2_5 | 0.25         | 936.94K    | 6.78G     | 29.8ms        |
