@@ -42,11 +42,25 @@ latent array： N = 10，L = 6，self attention shape：[b, d, H, W]，self atte
 
 ## cvt_io_v2_5:
 
-latent array： N = 3，L = 6，self attention shape：[b, d, H, W]，self attention共享权值
+latent array： N = 3，L = 1（实验设置出错），self attention shape：[b, d, H, W]，self attention共享权值
 
 100K steps, lr: 4e-3, wd: 1e-7
 
 ![image-20221004153728730](C:\Users\HASEE\AppData\Roaming\Typora\typora-user-images\image-20221004153728730.png)
+
+## cvt_io_v2_6:
+
+latent array： N = 5，L = 12，self attention shape：[b, d, H, W]，self attention共享权值
+
+100K steps, lr: 4e-3, wd: 1e-7
+
+30k steps之后nan了
+
+## cvt_io_v2_7:
+
+latent array： N = 5，L = 12，self attention shape：[b, d, H, W]，self attention共享权值
+
+100K steps, lr: 1e-3, wd: 1e-7
 
 |             | **IOU@0.50** | **Params** | **FLOPs** | **Cost-Time** |
 | ----------- | ------------ | ---------- | --------- | ------------- |
