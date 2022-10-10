@@ -54,13 +54,13 @@ latent array： N = 5，L = 12，self attention shape：[b, d, H, W]，self atte
 
 100K steps, lr: 4e-3, wd: 1e-7
 
-30k steps之后nan了
+30k steps之后nan了，cost-time34.12ms，可以看出self-attention是真不怎么耗时
 
 ## cvt_io_v2_7:
 
 latent array： N = 5，L = 12，self attention shape：[b, d, H, W]，self attention共享权值
 
-100K steps, lr: 1e-3, wd: 1e-7
+100K steps, lr: 2e-3, wd: 1e-7
 
 |             | **IOU@0.50** | **Params** | **FLOPs** | **Cost-Time** |
 | ----------- | ------------ | ---------- | --------- | ------------- |
