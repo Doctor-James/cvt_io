@@ -58,7 +58,7 @@ latent array： N = 5，L = 12，self attention shape：[b, d, H, W]，self atte
 
 ## cvt_io_v2_7:
 
-latent array： N = 5，L = 12，self attention shape：[b, d, H, W]，self attention共享权值
+latent array： N = 5，L = 10，self attention shape：[b, d, H, W]，self attention共享权值
 
 100K steps, lr: 2e-3, wd: 1e-7
 
@@ -69,3 +69,4 @@ latent array： N = 5，L = 12，self attention shape：[b, d, H, W]，self atte
 | cvt_io_v2_1 | 0.34         | 936.94K    | 6.918G    | 35.17ms       |
 | cvt_io_v2_2 | 0.328        | 936.94K    | 6.81G     | 33.08ms       |
 | cvt_io_v2_5 | 0.25         | 936.94K    | 6.78G     | 29.8ms        |
+| cvt_io_v2_7 | 0.28         |            |           |               |
