@@ -62,6 +62,18 @@ latent array： N = 5，L = 10，self attention shape：[b, d, H, W]，self atte
 
 100K steps, lr: 2e-3, wd: 1e-7
 
+## cvt_io_v2_8:
+
+latent array： N = 3，L = 6，self attention shape：[b, d, H, W]，self attention共享权值
+
+100K steps, lr: 4e-3, wd: 1e-7
+
+## cvt_io_v2_9:
+
+latent array： N = 5，L = 4，self attention shape：[b, d, H, W]，self attention共享权值
+
+100K steps, lr: 4e-3, wd: 1e-7
+
 |             | **IOU@0.50** | **Params** | **FLOPs** | **Cost-Time** |
 | ----------- | ------------ | ---------- | --------- | ------------- |
 | cvt         | 0.36         | 670.32K    | 6.934G    | 46.67ms       |
@@ -70,3 +82,4 @@ latent array： N = 5，L = 10，self attention shape：[b, d, H, W]，self atte
 | cvt_io_v2_2 | 0.328        | 936.94K    | 6.81G     | 33.08ms       |
 | cvt_io_v2_5 | 0.25         | 936.94K    | 6.78G     | 29.8ms        |
 | cvt_io_v2_7 | 0.28         |            |           |               |
+| cvt_io_v2_8 | 0.26         |            |           |               |
